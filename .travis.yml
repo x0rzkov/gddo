@@ -1,7 +1,18 @@
+services: docker
+
+sudo: required
+
 language: go
 go:
+  - 1.13.x
   - 1.11.x
   - 1.10.x
+
+matrix:
+  allow_failures:
+    - go: master
+  fast_finish: true
+
 install:
   - |
     LATEST_SDK="$(curl -fsSL 'https://www.googleapis.com/storage/v1/b/appengine-sdks/o?prefix=featured%2F' |
@@ -10,13 +21,47 @@ install:
     sort_by(.timeCreated)) | .[-1:] | .[] | .mediaLink')"
   - curl -sSLo gae_sdk.zip "$LATEST_SDK"
   - unzip -q gae_sdk.zip -d ~
+
+env:
+  DOCKER_COMPOSE_VERSION: 1.25.0
+  DOCKER_SLIM_VERSION: 1.26.1
+
 services:
   - redis-server
-before_script:
-  - export PATH=$PATH:"$HOME/go_appengine"
+
+before_install:
+  - sudo rm -f /usr/local/bin/docker-slim
+  - sudo rm -f /usr/local/bin/docker-slim-sensor
+  - curl -L https://github.com/docker-slim/docker-slim/releases/download/${DOCKER_SLIM_VERSION}/dist_linux.tar.gz --output docker-slim.tar.gz
+  - tar xvf docker-slim.tar.gz
+  - chmod +x dist_linux/docker-slim
+  - chmod +x dist_linux/docker-slim-sensor
+  - sudo mv dist_linux/docker-slim /usr/local/bin
+  - sudo mv dist_linux/docker-slim-sensor /usr/local/bin
+  - echo '{"experimental":true}' | sudo tee /etc/docker/daemon.json
+  - sudo service docker restart
+  - docker-compose --version
+  - sudo rm /usr/local/bin/docker-compose
+  - curl -L https://github.com/docker/compose/releases/download/${DOCKER_COMPOSE_VERSION}/docker-compose-`uname -s`-`uname -m` > docker-compose
+  - chmod +x docker-compose
+  - sudo mv docker-compose /usr/local/bin
+  - docker-compose --version
+  - docker ps
+
 script:
   - go test -v $(go list ./... | grep -v '/vendor\|gae-service-proxy\|talksapp\|lintapp')
   - pushd talksapp
   - ./setup.sh
   - goapp test -v .
   - popd
+  - docker-slim version
+  - docker network create web
+  - docker-compose up -d
+  - docker images
+  - docker ps
+
+after_script:
+  - docker images
+
+before_script:
+  - export PATH=$PATH:"$HOME/go_appengine"

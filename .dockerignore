@@ -1,0 +1,8 @@
+_data
+_data/
+_data/*
+_data/**
+Screenshot.png
+*.md
+Dockerfile
+docker-compose.yml

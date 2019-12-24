@@ -1,0 +1,75 @@
+---
+version: "3.7"
+services:
+
+  gddo-server:
+    image: gddo-server:latest-alpine
+    container_name: gddo-server
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+    - 80:80
+    - 443:443
+    depends_on:
+    - redis
+    - memcached
+    networks:
+    - intranet
+    - web
+    volumes:
+    - gddo-data:/opt/gddo/data
+    environment:
+      GA_ACCOUNT: ${GA_ACCOUNT}
+      GCLOUD_PROJECT: ${GCLOUD_PROJECT}
+      GITHUB_TOKEN: ${GITHUB_TOKEN}
+      GITHUB_CLIENT_ID: ${GITHUB_CLIENT_ID}
+      GITHUB_CLIENT_SECRET: ${GITHUB_CLIENT_SECRET}
+      USER_AGENT: ${USER_AGENT}
+    command: ["gddo-server", "--db-server", "redis:6379", "--memcache_addr", "memcached:11211"]
+
+  gddo-admin:
+    image: gddo-admin:latest-alpine
+    container_name: gddo-admin
+    build:
+      context: .
+      dockerfile: Dockerfile
+    depends_on:
+    - redis
+    networks:
+    - intranet
+    command: ["gddo-admin", "-h"]
+
+  redis:
+    image: "redis:alpine"
+    container_name: gddo-redis
+    ports:
+    - "6379:6379"
+    volumes:
+    - redis-data:/data
+    networks:
+    - intranet
+
+  memcached:
+    image: "memcached:alpine"
+    build:
+      context: .docker/memcached
+      dockerfile: Dockerfile
+    container_name: gddo-memcached
+    environment:
+      MEMCACHED_MEMORY: ${MEMCACHED_MEMORY}
+      MEMCACHED_MAX_CONNECTIONS: ${MEMCACHED_MAX_CONNECTIONS}
+      MEMCACHED_MAX_ITEM_SIZE: ${MEMCACHED_MAX_ITEM_SIZE}
+    ports:
+    - "11211:11211"
+    networks:
+    - intranet
+
+volumes:
+    gddo-data:
+    redis-data:
+
+networks: 
+  intranet:
+  web:
+    external: true  
